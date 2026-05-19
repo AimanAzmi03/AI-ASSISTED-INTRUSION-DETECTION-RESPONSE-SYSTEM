@@ -1,0 +1,1 @@
+A lightweight, hybrid Network Intrusion Detection & Prevention System (NIDS/NIPS) combining rule-based detection with unsupervised Machine Learning (Isolation Forest) for real-time threat detection and automated response.

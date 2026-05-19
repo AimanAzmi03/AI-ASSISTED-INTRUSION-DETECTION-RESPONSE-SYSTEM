@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IDRS | Security Operations Center</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: { mono: ['JetBrains Mono', 'monospace'], sans: ['Inter', 'sans-serif'] },
+                    colors: {
+                        cyber: { black: '#0a0a0f', dark: '#12121a', panel: '#1a1a2e', border: '#2d2d44', primary: '#00d4ff', danger: '#ff3860', warning: '#ffaa00', success: '#00d9a3', info: '#7c3aed' }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body { background: #0a0a0f; background-image: radial-gradient(circle at 20% 50%, rgba(0, 212, 255, 0.03) 0%, transparent 50%), radial-gradient(circle at 80% 80%, rgba(255, 56, 96, 0.03) 0%, transparent 50%); }
+        .glass-panel { background: rgba(26, 26, 46, 0.6); backdrop-filter: blur(12px); border: 1px solid rgba(45, 45, 68, 0.5); }
+        .threat-high { border-left: 3px solid #ff3860; }
+        .threat-medium { border-left: 3px solid #ffaa00; }
+        .threat-low { border-left: 3px solid #00d9a3; }
+        .threat-critical { border-left: 3px solid #ff3860; animation: pulse-border 2s infinite; }
+        @keyframes pulse-border { 0%, 100% { border-left-color: #ff3860; } 50% { border-left-color: #ff6b6b; } }
+        .grid-bg { background-image: linear-gradient(rgba(0, 212, 255, 0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(0, 212, 255, 0.03) 1px, transparent 1px); background-size: 50px 50px; }
+        .scrollbar-hide::-webkit-scrollbar { display: none; }
+        .tab-active { border-bottom: 2px solid #00d4ff; color: #00d4ff; }
+        .tab-inactive { border-bottom: 2px solid transparent; color: #6b7280; }
+    </style>
+</head>
+<body class="text-gray-300 font-sans min-h-screen grid-bg">
+    <!-- Navigation -->
+    <nav class="glass-panel sticky top-0 z-50 border-b border-cyber-border">
+        <div class="max-w-full mx-auto px-6 py-4">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center space-x-4">
+                    <div class="relative">
+                        <div class="w-10 h-10 bg-gradient-to-br from-cyber-primary to-cyber-info rounded-lg flex items-center justify-center text-white font-bold">IDRS</div>
+                        <div class="absolute -bottom-1 -right-1 w-3 h-3 bg-cyber-success rounded-full animate-pulse"></div>
+                    </div>
+                    <div>
+                        <h1 class="text-xl font-bold text-white tracking-tight">IDRS <span class="text-cyber-primary font-mono text-sm">v3.0</span></h1>
+                        <p class="text-xs text-gray-500 font-mono">Intrusion Detection & Response System</p>
+                    </div>
+                </div>
+                <div class="flex items-center space-x-6">
+                    <div class="flex items-center space-x-3 bg-cyber-dark/50 px-4 py-2 rounded-full border border-cyber-border">
+                        <span class="w-2 h-2 bg-cyber-success rounded-full animate-pulse"></span>
+                        <span class="text-sm font-mono text-cyber-success">SYSTEM OPERATIONAL</span>
+                    </div>
+                    <div class="flex space-x-6 text-sm font-mono">
+                        <div class="text-center"><div class="text-cyber-danger font-bold text-lg" id="stat-critical">0</div><div class="text-xs text-gray-500">CRITICAL</div></div>
+                        <div class="text-center"><div class="text-cyber-warning font-bold text-lg" id="stat-high">0</div><div class="text-xs text-gray-500">HIGH</div></div>
+                        <div class="text-center"><div class="text-cyber-primary font-bold text-lg" id="stat-total">0</div><div class="text-xs text-gray-500">TOTAL</div></div>
+                        <div class="text-center"><div class="text-cyber-danger font-bold text-lg" id="stat-blocked">0</div><div class="text-xs text-gray-500">BLOCKED</div></div>
+                    </div>
+                    <div class="flex items-center space-x-3 border-l border-cyber-border pl-6">
+                        <div class="text-right"><div class="text-sm font-medium text-white">admin</div><div class="text-xs text-gray-500 font-mono" id="session-time">00:00:00</div></div>
+                        <a href="/logout" class="p-2 hover:bg-cyber-danger/20 rounded-lg transition-colors">Logout</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main class="p-6 max-w-full mx-auto space-y-6">
+        <!-- Tabs -->
+        <div class="flex space-x-6 border-b border-cyber-border">
+            <button onclick="switchTab('alerts')" id="tab-alerts" class="pb-3 px-2 tab-active font-medium text-sm">Live Threat Feed</button>
+            <button onclick="switchTab('blocked')" id="tab-blocked" class="pb-3 px-2 tab-inactive font-medium text-sm">Blocked IPs <span id="blocked-badge" class="hidden bg-cyber-danger text-white text-xs px-2 py-0.5 rounded-full ml-1">0</span></button>
+            <button onclick="switchTab('prevention')" id="tab-prevention" class="pb-3 px-2 tab-inactive font-medium text-sm">Prevention Settings</button>
+        </div>
+
+        <!-- Alerts Panel -->
+        <div id="panel-alerts">
+            <div class="flex items-center justify-between mb-4">
+                <div class="flex items-center space-x-4">
+                    <h2 class="text-lg font-semibold text-white">Active Threats</h2>
+                    <span class="text-xs font-mono text-cyber-primary bg-cyber-dark/50 px-2 py-1 rounded border border-cyber-border">REAL-TIME</span>
+                </div>
+                <div class="flex items-center space-x-2">
+                    <button onclick="setFilter('all')" id="filter-all" class="px-3 py-1 rounded text-sm bg-cyber-primary/20 text-cyber-primary">All</button>
+                    <button onclick="setFilter('critical')" id="filter-critical" class="px-3 py-1 rounded text-sm text-gray-400 hover:text-white">Critical</button>
+                    <button onclick="setFilter('high')" id="filter-high" class="px-3 py-1 rounded text-sm text-gray-400 hover:text-white">High</button>
+                </div>
+            </div>
+            <div class="glass-panel rounded-xl overflow-hidden border border-cyber-border">
+                <div class="grid grid-cols-6 gap-4 px-6 py-3 bg-cyber-dark/80 border-b border-cyber-border text-xs font-mono text-gray-400 uppercase">
+                    <div>Timestamp</div><div>Severity</div><div>Threat Type</div><div>Attacker</div><div>Victim</div><div>Actions</div>
+                </div>
+                <div id="alerts-container" class="max-h-[400px] overflow-y-auto scrollbar-hide p-4 text-center text-gray-500">
+                    Loading threats...
+                </div>
+            </div>
+        </div>
+
+        <!-- Blocked Panel -->
+        <div id="panel-blocked" class="hidden">
+            <h2 class="text-lg font-semibold text-white mb-4">Blocked Attackers</h2>
+            <div class="glass-panel rounded-xl overflow-hidden border border-cyber-border">
+                <div class="grid grid-cols-6 gap-4 px-6 py-3 bg-cyber-dark/80 border-b border-cyber-border text-xs font-mono text-gray-400 uppercase">
+                    <div>IP Address</div><div>Threat</div><div>Blocked At</div><div>Expires</div><div>Count</div><div>Actions</div>
+                </div>
+                <div id="blocked-container" class="max-h-[400px] overflow-y-auto scrollbar-hide p-4 text-center text-gray-500">
+                    No blocked IPs
+                </div>
+            </div>
+        </div>
+
+        <!-- Prevention Panel -->
+        <div id="panel-prevention" class="hidden">
+            <h2 class="text-lg font-semibold text-white mb-4">Prevention Configuration</h2>
+            <div class="grid grid-cols-3 gap-4">
+                <div class="glass-panel p-4 rounded-xl border border-cyber-border">
+                    <h3 class="font-semibold text-white mb-2">Auto-Block</h3>
+                    <p class="text-sm text-gray-400">Status: <span class="text-cyber-success">ENABLED</span></p>
+                </div>
+                <div class="glass-panel p-4 rounded-xl border border-cyber-border">
+                    <h3 class="font-semibold text-white mb-2">Block Duration</h3>
+                    <p class="text-sm text-gray-400">30 minutes temporary, permanent after 3 offenses</p>
+                </div>
+                <div class="glass-panel p-4 rounded-xl border border-cyber-border">
+                    <h3 class="font-semibold text-white mb-2">Thresholds</h3>
+                    <p class="text-sm text-gray-400">DoS: 100 packets | Scan: 10 ports</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <div class="flex items-center justify-between text-xs font-mono text-gray-500 pt-4 border-t border-cyber-border">
+            <div>Last updated: <span id="last-update" class="text-cyber-primary">--:--:--</span> | Connection: <span id="conn-status" class="text-cyber-success">Stable</span> | Latency: <span id="latency">0ms</span></div>
+            <div>IDRS Engine: <span class="text-cyber-success">Running</span> | Auto-Prevention: <span class="text-cyber-success">Active</span></div>
+        </div>
+    </main>
+
+    <div id="toast-container" class="fixed bottom-6 right-6 z-50 flex flex-col space-y-2"></div>
+
+    <script>
+        // Simplified JavaScript without template literal issues
+        let currentTab = 'alerts', currentFilter = 'all', refreshInterval = 3000;
+        let alertsData = [], blockedData = [], updateTimer = null;
+        let sessionStartTime = Date.now();
+
+        function switchTab(tab) {
+            currentTab = tab;
+            ['alerts', 'blocked', 'prevention'].forEach(t => {
+                document.getElementById('panel-' + t).classList.add('hidden');
+                document.getElementById('tab-' + t).classList.remove('tab-active');
+                document.getElementById('tab-' + t).classList.add('tab-inactive');
+            });
+            document.getElementById('panel-' + tab).classList.remove('hidden');
+            document.getElementById('tab-' + tab).classList.remove('tab-inactive');
+            document.getElementById('tab-' + tab).classList.add('tab-active');
+        }
+
+        function setFilter(filter) {
+            currentFilter = filter;
+            ['all', 'critical', 'high'].forEach(f => {
+                const btn = document.getElementById('filter-' + f);
+                if (f === filter) {
+                    btn.className = 'px-3 py-1 rounded text-sm bg-cyber-primary/20 text-cyber-primary';
+                } else {
+                    btn.className = 'px-3 py-1 rounded text-sm text-gray-400 hover:text-white';
+                }
+            });
+            renderAlerts();
+        }
+
+        async function updateData() {
+            try {
+                const startTime = performance.now();
+                const response = await fetch('/api/alerts');
+                const data = await response.json();
+                
+                document.getElementById('latency').textContent = Math.round(performance.now() - startTime) + 'ms';
+                document.getElementById('last-update').textContent = new Date().toLocaleTimeString();
+                document.getElementById('conn-status').textContent = 'Stable';
+                document.getElementById('conn-status').className = 'text-cyber-success';
+                
+                alertsData = data;
+                updateStats();
+                renderAlerts();
+            } catch (error) {
+                console.error('Fetch error:', error);
+                document.getElementById('conn-status').textContent = 'Error';
+                document.getElementById('conn-status').className = 'text-cyber-danger';
+                document.getElementById('latency').textContent = 'ERR';
+            }
+        }
+
+        async function refreshBlocked() {
+            try {
+                const response = await fetch('/api/blocked');
+                const data = await response.json();
+                blockedData = data;
+                document.getElementById('stat-blocked').textContent = data.length;
+                
+                const badge = document.getElementById('blocked-badge');
+                if (data.length > 0) {
+                    badge.textContent = data.length;
+                    badge.classList.remove('hidden');
+                } else {
+                    badge.classList.add('hidden');
+                }
+                
+                renderBlocked();
+            } catch (error) {
+                console.error('Failed to fetch blocked:', error);
+            }
+        }
+
+        function updateStats() {
+            document.getElementById('stat-critical').textContent = alertsData.filter(a => a.threat.toUpperCase().includes('CRITICAL')).length;
+            document.getElementById('stat-high').textContent = alertsData.filter(a => a.threat.toUpperCase().includes('HIGH') || a.threat.toUpperCase().includes('SEVERE')).length;
+            document.getElementById('stat-total').textContent = alertsData.length;
+        }
+
+        function renderAlerts() {
+            const container = document.getElementById('alerts-container');
+            if (alertsData.length === 0) {
+                container.innerHTML = '<div class="py-8 text-gray-500">No active threats detected</div>';
+                return;
+            }
+
+            let filtered = alertsData;
+            if (currentFilter === 'critical') filtered = alertsData.filter(a => a.threat.toUpperCase().includes('CRITICAL'));
+            else if (currentFilter === 'high') filtered = alertsData.filter(a => ['HIGH', 'CRITICAL', 'SEVERE'].some(s => a.threat.toUpperCase().includes(s)));
+
+            container.innerHTML = filtered.map(alert => {
+                const time = new Date(alert.timestamp).toLocaleTimeString();
+                let severityClass = 'threat-low';
+                let badge = '<span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-bold bg-green-500/20 text-green-400">LOW</span>';
+                
+                if (alert.threat.toUpperCase().includes('CRITICAL')) {
+                    severityClass = 'threat-critical';
+                    badge = '<span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-bold bg-red-500/20 text-red-400"><span class="w-1.5 h-1.5 bg-red-500 rounded-full mr-1 animate-pulse"></span>CRITICAL</span>';
+                } else if (alert.threat.toUpperCase().includes('HIGH')) {
+                    severityClass = 'threat-high';
+                    badge = '<span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-bold bg-orange-500/20 text-orange-400">HIGH</span>';
+                }
+
+                return '<div class="grid grid-cols-6 gap-4 px-4 py-3 border-b border-cyber-border/50 hover:bg-cyber-primary/5 ' + severityClass + '">' +
+                    '<div class="font-mono text-sm text-gray-400">' + time + '</div>' +
+                    '<div>' + badge + '</div>' +
+                    '<div class="text-white text-sm">' + alert.threat + '</div>' +
+                    '<div class="font-mono text-sm text-cyber-danger">' + alert.attacker + '</div>' +
+                    '<div class="font-mono text-sm text-cyber-primary">' + alert.victim + '</div>' +
+                    '<div class="text-sm text-gray-400 truncate" title="' + alert.details + '">' + alert.details + '</div>' +
+                '</div>';
+            }).join('');
+        }
+
+        function renderBlocked() {
+            const container = document.getElementById('blocked-container');
+            if (blockedData.length === 0) {
+                container.innerHTML = '<div class="py-8 text-gray-500">No IPs currently blocked</div>';
+                return;
+            }
+
+            container.innerHTML = blockedData.map(block => {
+                const expires = block.expires ? new Date(block.expires).toLocaleString() : 'PERMANENT';
+                const statusColor = block.status === 'active' ? 'text-cyber-danger' : 'text-gray-500';
+                const btnDisabled = block.status !== 'active' ? 'disabled' : '';
+                
+                return '<div class="grid grid-cols-6 gap-4 px-4 py-3 border-b border-cyber-border/50 items-center">' +
+                    '<div class="font-mono text-sm text-cyber-danger">' + block.ip + '</div>' +
+                    '<div class="text-sm text-white">' + block.threat + '</div>' +
+                    '<div class="font-mono text-xs text-gray-400">' + new Date(block.blocked_at).toLocaleString() + '</div>' +
+                    '<div class="font-mono text-xs ' + (expires === 'PERMANENT' ? 'text-cyber-danger' : 'text-gray-400') + '">' + expires + '</div>' +
+                    '<div class="text-sm text-cyber-warning font-bold">' + block.count + '</div>' +
+                    '<div class="flex items-center space-x-2">' +
+                        '<span class="text-xs font-mono ' + statusColor + ' uppercase">' + block.status + '</span>' +
+                        (block.status === 'active' 
+                            ? '<button onclick="unblockIP(\'' + block.ip + '\')" class="px-2 py-1 bg-cyber-success/20 text-cyber-success text-xs rounded hover:bg-cyber-success/40 transition-colors font-mono border border-cyber-success/30">UNBLOCK</button>' 
+                            : '') +
+                    '</div>' +
+                '</div>';
+            }).join('');
+        }
+
+        function showToast(message, type) {
+            const container = document.getElementById('toast-container');
+            const color = type === 'success' ? 'border-cyber-success text-cyber-success' : 'border-cyber-danger text-cyber-danger';
+            const bg = type === 'success' ? 'bg-cyber-success/10' : 'bg-cyber-danger/10';
+            
+            const toast = document.createElement('div');
+            toast.className = 'glass-panel px-4 py-3 rounded-lg border-l-2 ' + color + ' ' + bg + ' text-sm font-mono flex items-center space-x-2 shadow-lg min-w-[250px]';
+            toast.innerHTML = '<span class="' + (type === 'success' ? 'text-cyber-success' : 'text-cyber-danger') + ' font-bold">' + (type === 'success' ? '✓' : '✗') + '</span><span>' + message + '</span>';
+            
+            container.appendChild(toast);
+            setTimeout(() => {
+                toast.style.opacity = '0';
+                toast.style.transition = 'opacity 0.5s';
+                setTimeout(() => toast.remove(), 500);
+            }, 3000);
+        }
+
+        async function unblockIP(ip) {
+            if (!confirm('Unblock IP ' + ip + '?')) return;
+            
+            try {
+                const response = await fetch('/api/unblock', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ ip: ip })
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    showToast('Unblocked ' + ip, 'success');
+                    refreshBlocked();  // Refresh the list immediately
+                } else {
+                    showToast('Failed: ' + (result.error || 'Unknown error'), 'error');
+                }
+            } catch (error) {
+                showToast('Network error: ' + error.message, 'error');
+            }
+        }
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', () => {
+            updateData();
+            refreshBlocked();
+            setInterval(updateData, 3000);
+            setInterval(refreshBlocked, 10000);
+            setInterval(() => {
+                const elapsed = Math.floor((Date.now() - sessionStartTime) / 1000);
+                const h = Math.floor(elapsed / 3600).toString().padStart(2, '0');
+                const m = Math.floor((elapsed % 3600) / 60).toString().padStart(2, '0');
+                const s = (elapsed % 60).toString().padStart(2, '0');
+                document.getElementById('session-time').textContent = h + ':' + m + ':' + s;
+            }, 1000);
+        });
+    </script>
+</body>
+</html>

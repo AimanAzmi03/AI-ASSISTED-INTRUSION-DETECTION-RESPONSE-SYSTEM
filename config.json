@@ -1,0 +1,8 @@
+{
+    "protected_subnet": "192.168.1.",
+    "remote_user": "aimannrazmi",
+    "remote_pass": "Peq3231#",
+    "interface": "enp0s3",
+    "dos_threshold": 100,
+    "scan_threshold": 20
+}

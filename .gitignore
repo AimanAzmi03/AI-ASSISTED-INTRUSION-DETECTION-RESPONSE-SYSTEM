@@ -1,0 +1,16 @@
+# Datasets (too large for GitHub)
+data/*.csv
+data/*.pcap
+*.pcap_ISCX.csv
+
+# Python
+__pycache__/
+*.pyc
+venv/
+.env
+
+# Models (can be regenerated)
+models/*.pkl
+
+# Database
+*.db
