@@ -1,11 +1,13 @@
 from flask import Flask, render_template, request, redirect, url_for, session, jsonify
 import sqlite3
 import os
+import subprocess
+import ipaddress
 from werkzeug.security import generate_password_hash, check_password_hash
 from datetime import datetime, timedelta
 
 app = Flask(__name__)
-app.secret_key = "CHANGE_THIS_SECRET_KEY"  # Change in production!
+app.secret_key = os.environ.get("SECRET_KEY", "dev-secret-change-me")
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DB_FILE = os.path.join(BASE_DIR, "idrs.db")
@@ -15,6 +17,17 @@ def get_db():
     conn = sqlite3.connect(DB_FILE)
     conn.row_factory = sqlite3.Row
     return conn
+
+
+def is_valid_ip(ip):
+    """Validate IP address to prevent command injection."""
+    if not ip or not isinstance(ip, str):
+        return False
+    try:
+        ipaddress.ip_address(ip)
+        return True
+    except ValueError:
+        return False
 
 
 def login_required(fn):
@@ -108,10 +121,13 @@ def unblock():
     if not ip:
         return jsonify({"success": False, "error": "No IP provided"}), 400
 
+    if not is_valid_ip(ip):
+        return jsonify({"success": False, "error": "Invalid IP address"}), 400
+
     try:
-        import subprocess
-        subprocess.run(f"iptables -D INPUT -s {ip} -j DROP 2>/dev/null; iptables -D FORWARD -s {ip} -j DROP 2>/dev/null",
-                       shell=True, capture_output=True)
+        # SAFE: list arguments, no shell=True, no f-string
+        subprocess.run(["iptables", "-D", "INPUT", "-s", ip, "-j", "DROP"], capture_output=True)
+        subprocess.run(["iptables", "-D", "FORWARD", "-s", ip, "-j", "DROP"], capture_output=True)
 
         db = get_db()
         db.execute("UPDATE blocked_ips SET status = 'manual_unblock' WHERE ip_address = ?", (ip,))
@@ -131,10 +147,13 @@ def quick_block():
     if not ip:
         return jsonify({"success": False, "error": "No IP provided"}), 400
 
+    if not is_valid_ip(ip):
+        return jsonify({"success": False, "error": "Invalid IP address"}), 400
+
     try:
-        import subprocess
-        subprocess.run(f"iptables -I INPUT 1 -s {ip} -j DROP", shell=True, check=True, capture_output=True)
-        subprocess.run(f"iptables -I FORWARD 1 -s {ip} -j DROP", shell=True, capture_output=True)
+        # SAFE: list arguments, no shell=True
+        subprocess.run(["iptables", "-I", "INPUT", "1", "-s", ip, "-j", "DROP"], check=True, capture_output=True)
+        subprocess.run(["iptables", "-I", "FORWARD", "1", "-s", ip, "-j", "DROP"], capture_output=True)
 
         db = get_db()
         blocked_at = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -176,5 +195,5 @@ if __name__ == "__main__":
     print("[*] Starting IDRS Dashboard...")
     print("[*] Access URLs:")
     print("    Local:    http://127.0.0.1:5000")
-    print("    Network:  http://<THIS_VM_IP>:5000")
+    print("    Network:  http://<<THIS_VM_IP>:5000")
     app.run(host="0.0.0.0", port=5000, debug=False)
