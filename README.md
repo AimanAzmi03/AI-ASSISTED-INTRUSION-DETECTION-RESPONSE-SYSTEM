@@ -1,5 +1,5 @@
 
-readme_content = '''# AI-ASSISTED INTRUSION DETECTION & RESPONSE SYSTEM (IDRS)
+## AI-ASSISTED INTRUSION DETECTION & RESPONSE SYSTEM (IDRS)
 
 **Detect, Respond, Defend — Always One Step Ahead**
 
@@ -254,9 +254,9 @@ You should see `192.168.56.103` as the first hop, confirming traffic flows throu
 ```text
 AI-ASSISTED-INTRUSION-DETECTION-RESPONSE-SYSTEM/
 │
-├── idrs.py                   # Main IDS engine (capture + detection + blocking)
+├── Manual_Rules_Fast.py      # Main IDS engine (capture + detection + blocking)
 ├── ml_detector.py            # Real-time ML anomaly detector (Isolation Forest)
-├── app.py                    # Flask web dashboard (SOC interface)
+├── dashboard.py              # Flask web dashboard (SOC interface)
 ├── retrain_model.py          # Model training script (CICIDS2017 → Isolation Forest)
 ├── init_db.py                # Database initialization (alerts, blocked_ips, admins)
 ├── py.py                     # Admin user seed script
@@ -318,13 +318,13 @@ Build IDRS from the source and install dependencies:
 
 4. **Initialize the database and create the admin user:**
    ```bash
-   python init_db.py
-   python py.py
+   python3 init_db.py
+   python3 py.py
    ```
 
 5. **Train the ML model (if models/ folder is empty):**
    ```bash
-   python retrain_model.py
+   python3 retrain_model.py
    ```
 
 ### Usage
@@ -333,14 +333,14 @@ Run the system components in separate terminals on the **IDS VM**:
 
 **Terminal 1 — Start the Detection Engine:**
 ```bash
-sudo python idrs.py
+sudo python3 Manual_Rules_Fast.py
 ```
 > Requires sudo for Scapy packet capture and iptables manipulation.
 
 **Terminal 2 — Start the Dashboard:**
 ```bash
 source venv/bin/activate
-python app.py
+python3 dashboard.py
 ```
 
 **Access the SOC Dashboard:**
@@ -354,9 +354,8 @@ IDRS uses controlled attack simulation for validation. Run these from the **Atta
 | Test | Command | Expected Result |
 |------|---------|---------------|
 | **DoS Flood** | `sudo hping3 --icmp --flood 192.168.57.102` | Rule alert + iptables block within 10s |
-| **Port Scan** | `sudo nmap 192.168.57.102` | Rule alert + block within 5s |
-| **ML Anomaly** | `ping -s 65500 -c 5 192.168.57.102` | ML alert after flow timeout (~15s) |
-| **Volume Test** | `cat /dev/zero | nc 192.168.57.102 9999` | ML anomaly detected & blocked |
+| **Port Scan** | `sudo nmap -sS 192.168.57.102` | Rule alert + block within 5s |
+| **ML Anomaly** | `sudo hping3 -S -p 80 --flood --rand-source 192.168.57.102` | ML alert after flow timeout (~15s) |
 
 Verify blocks on the IDS VM:
 ```bash
@@ -398,8 +397,3 @@ The CICIDS2017 dataset is required for training but not included in this reposit
 - **Supervisor:** Ts. Wan Hazimah Wan Ismail
 - **Institution:** Universiti Kuala Lumpur, Malaysian Institute of Information Technology (UniKL MIIT)
 '''
-
-with open('/mnt/agents/output/README.md', 'w') as f:
-    f.write(readme_content)
-
-print("README.md saved successfully")
